@@ -11,7 +11,7 @@
  * KNOWN GAP: the 500-char cap on `text` has no schema-level enforcement —
  * ColumnDefinition has no length/pattern validator and RecordRoom has no
  * beforeWrite hook (confirmed against worker.d.ts/worker.js). Enforced only
- * client-side (composer Textarea maxLength). Documented in WRITEUP.md.
+ * client-side (composer Textarea maxLength). Documented in README.md.
  */
 
 import type { CollectionSchema } from 'deepspace/schema'

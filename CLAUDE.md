@@ -1,7 +1,7 @@
 # Incident Room — agent rules
 
 Real-time incident room on DeepSpace. Teams log an incident timeline live; AI drafts a grounded postmortem.
-Product spec: SPEC.md. Work order: PROMPTS.md. Do not build anything not in SPEC.md.
+Product spec: SPEC.md. Work order: docs/PROMPTS.md. Do not build anything not in SPEC.md.
 
 ## Source of truth for APIs
 1. https://docs.deep.space/llms.txt → pick 1–2 pages → fetch as `<page>.md`.

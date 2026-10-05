@@ -44,7 +44,7 @@ postmortems
 ## Design
 Own theme (deploy checklist requires replacing slate/paper + starter home). Ops-console feel: dense, monospace timestamps, severity colors, dark default. No gradients/emoji decoration.
 
-## Out of scope (write these into WRITEUP.md)
+## Out of scope (written into README.md)
 - Payments: no monetization in an eval build.
 - LiveKit/voice: a written timeline is the product.
 - File uploads: pasted log text covers it.
