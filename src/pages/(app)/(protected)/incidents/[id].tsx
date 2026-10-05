@@ -1,15 +1,36 @@
 /**
- * Incident detail — minimal for Phase 3: just enough for the create and
- * demo flows to navigate somewhere real, with loading/not-found/error
- * states. Phase 4 adds the status control, live timeline, composer, and
- * presence avatars.
+ * Incident detail — header + creator-only status control, live timeline,
+ * composer, presence, and a postmortem placeholder (Phase 5 wires
+ * generation).
  */
 
+import { useState, type FormEvent } from 'react'
 import { useParams } from 'react-router-dom'
-import { useQuery } from 'deepspace'
-import { Badge } from '@/components/ui'
+import {
+  getUserColor,
+  useAuth,
+  useDisplayName,
+  useMutations,
+  usePresenceRoom,
+  useQuery,
+  type RecordData,
+} from 'deepspace'
+import {
+  Avatar,
+  AvatarFallback,
+  Badge,
+  Button,
+  ConfirmModal,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  Textarea,
+  useToast,
+} from '@/components/ui'
 import { formatTimestamp } from '@/lib/utils'
-import type { IncidentData, Severity } from '@/lib/types'
+import type { EntryKind, IncidentData, IncidentStatus, Severity, TimelineEntryData } from '@/lib/types'
 
 const SEVERITY_BADGE: Record<Severity, 'sev1' | 'sev2' | 'sev3'> = {
   SEV1: 'sev1',
@@ -19,21 +40,33 @@ const SEVERITY_BADGE: Record<Severity, 'sev1' | 'sev2' | 'sev3'> = {
 
 export default function IncidentDetailPage() {
   const { id } = useParams<{ id: string }>()
-  const { records, status } = useQuery<IncidentData>('incidents')
-  const incident = records.find((r) => r.recordId === id)
+  const incidentId = id ?? ''
+  const { userId } = useAuth()
+  const displayName = useDisplayName() ?? 'User'
 
-  if (status === 'loading') {
+  const { records: incidents, status: incidentStatus } = useQuery<IncidentData>('incidents')
+  const incident = incidents.find((r) => r.recordId === incidentId)
+
+  const { records: entries, status: entriesStatus } = useQuery<TimelineEntryData>(
+    'timeline-entries',
+    { where: { incidentId }, orderBy: 'occurredAt', orderDir: 'asc' },
+  )
+
+  const { peers } = usePresenceRoom(`incident:${incidentId}`)
+
+  if (incidentStatus === 'loading') {
     return (
-      <div className="mx-auto max-w-3xl px-6 py-16">
+      <div className="mx-auto max-w-4xl px-6 py-16">
         <div className="h-8 w-64 animate-pulse rounded-md bg-card" />
       </div>
     )
   }
 
-  if (status === 'error') {
+  if (incidentStatus === 'error') {
     return (
       <div className="mx-auto max-w-3xl px-6 py-16 text-sm text-destructive">
-        Could not load this incident. Try refreshing the page.
+        Could not load this incident. You may not have permission to view it, or there was a
+        connection problem — try refreshing the page.
       </div>
     )
   }
@@ -46,31 +79,364 @@ export default function IncidentDetailPage() {
     )
   }
 
+  const isCreator = incident.createdBy === userId
+
   return (
-    <div className="mx-auto max-w-3xl px-6 py-16 text-foreground">
-      <div className="mb-6 flex items-center gap-3">
-        <Badge variant={SEVERITY_BADGE[incident.data.severity]}>{incident.data.severity}</Badge>
+    <div className="mx-auto max-w-4xl px-6 py-16 text-foreground">
+      <Header incident={incident} isCreator={isCreator} />
+
+      <div className="mt-10 grid gap-8 lg:grid-cols-[1fr_280px]">
+        <div className="min-w-0 space-y-8">
+          <Timeline entries={entries} status={entriesStatus} currentUserId={userId} />
+          <Composer incidentId={incidentId} displayName={displayName} />
+        </div>
+
+        <div className="space-y-6">
+          <PresencePanel peers={peers} currentUserId={userId} displayName={displayName} />
+          <PostmortemPanel entryCount={entries.length} />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function Header({
+  incident,
+  isCreator,
+}: {
+  incident: RecordData<IncidentData>
+  isCreator: boolean
+}) {
+  const mutations = useMutations<IncidentData>('incidents')
+  const { error, success } = useToast()
+  const [updating, setUpdating] = useState(false)
+
+  async function handleStatusChange(next: IncidentStatus) {
+    if (next === incident.data.status) return
+    setUpdating(true)
+    try {
+      await mutations.putConfirmed(incident.recordId, {
+        status: next,
+        ...(next === 'resolved' ? { resolvedAt: new Date().toISOString() } : {}),
+      })
+    } catch (e) {
+      // The server's denial text ("Permission denied: ...") is safe to show
+      // directly — it's exactly what SPEC means by "RBAC is the real gate".
+      error('Could not update status', e instanceof Error ? e.message : 'Try again in a moment.')
+    } finally {
+      setUpdating(false)
+    }
+  }
+
+  async function handleCopyLink() {
+    await navigator.clipboard.writeText(window.location.href)
+    success('Link copied', 'Anyone signed in can open it.')
+  }
+
+  return (
+    <div className="flex flex-wrap items-start justify-between gap-4 border-b border-border pb-6">
+      <div className="min-w-0">
+        <div className="mb-2 flex items-center gap-2">
+          <Badge variant={SEVERITY_BADGE[incident.data.severity]}>{incident.data.severity}</Badge>
+          <Badge variant="outline" data-testid="status-badge" className="capitalize">
+            {incident.data.status}
+          </Badge>
+        </div>
         <h1 data-testid="incident-title" className="text-2xl font-bold tracking-tight">
           {incident.data.title}
         </h1>
+        <p className="mt-1 text-sm text-muted-foreground">{incident.data.system}</p>
       </div>
-      <dl className="flex flex-wrap gap-6 text-sm">
-        <div>
-          <dt className="text-muted-foreground">System</dt>
-          <dd className="text-foreground">{incident.data.system}</dd>
-        </div>
-        <div>
-          <dt className="text-muted-foreground">Status</dt>
-          <dd className="capitalize text-foreground">{incident.data.status}</dd>
-        </div>
-        <div>
-          <dt className="text-muted-foreground">Created</dt>
-          <dd className="font-mono text-foreground">{formatTimestamp(incident.createdAt)}</dd>
-        </div>
-      </dl>
-      <p className="mt-10 text-sm text-muted-foreground">
-        Timeline, status control, and postmortem generation arrive in the next phase.
-      </p>
+
+      <div className="flex items-center gap-2">
+        {isCreator && (
+          <Select
+            value={incident.data.status}
+            onValueChange={(v) => handleStatusChange(v as IncidentStatus)}
+          >
+            <SelectTrigger
+              data-testid="status-control"
+              className="w-40"
+              disabled={updating || !mutations.ready}
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="investigating">Investigating</SelectItem>
+              <SelectItem value="mitigated">Mitigated</SelectItem>
+              <SelectItem value="resolved">Resolved</SelectItem>
+            </SelectContent>
+          </Select>
+        )}
+        <Button variant="secondary" onClick={handleCopyLink}>
+          Copy link
+        </Button>
+      </div>
     </div>
+  )
+}
+
+function Timeline({
+  entries,
+  status,
+  currentUserId,
+}: {
+  entries: RecordData<TimelineEntryData>[]
+  status: 'loading' | 'ready' | 'error'
+  currentUserId: string | null
+}) {
+  return (
+    <section>
+      <h2 className="mb-4 text-lg font-semibold">Timeline</h2>
+
+      {status === 'loading' && (
+        <div className="space-y-2" aria-busy="true">
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="h-14 animate-pulse rounded-lg border border-border bg-card" />
+          ))}
+        </div>
+      )}
+
+      {status === 'error' && (
+        <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive">
+          Could not load the timeline. Try refreshing the page.
+        </div>
+      )}
+
+      {status === 'ready' && entries.length === 0 && (
+        <p className="rounded-lg border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
+          No entries yet. Add the first one below.
+        </p>
+      )}
+
+      {status === 'ready' && entries.length > 0 && (
+        <div className="space-y-2">
+          {entries.map((entry) => (
+            <TimelineEntryRow key={entry.recordId} entry={entry} currentUserId={currentUserId} />
+          ))}
+        </div>
+      )}
+    </section>
+  )
+}
+
+function TimelineEntryRow({
+  entry,
+  currentUserId,
+}: {
+  entry: RecordData<TimelineEntryData>
+  currentUserId: string | null
+}) {
+  const mutations = useMutations<TimelineEntryData>('timeline-entries')
+  const isOwn = entry.createdBy === currentUserId
+  const [editing, setEditing] = useState(false)
+  const [text, setText] = useState(entry.data.text)
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
+
+  function handleSave() {
+    const trimmed = text.trim()
+    if (trimmed === '' || trimmed === entry.data.text) {
+      setEditing(false)
+      setText(entry.data.text)
+      return
+    }
+    mutations.put(entry.recordId, { text: trimmed })
+    setEditing(false)
+  }
+
+  function handleDelete() {
+    mutations.remove(entry.recordId)
+    setConfirmingDelete(false)
+  }
+
+  return (
+    <div data-testid="timeline-entry" className="flex gap-3 rounded-lg border border-border bg-card p-3">
+      <span className="shrink-0 pt-0.5 font-mono text-xs text-muted-foreground">
+        {formatTimestamp(entry.data.occurredAt)}
+      </span>
+      <Badge variant="outline" className="h-fit shrink-0 capitalize">
+        {entry.data.kind}
+      </Badge>
+
+      <div className="min-w-0 flex-1">
+        {editing ? (
+          <div className="space-y-2">
+            <Textarea
+              value={text}
+              onChange={(e) => setText(e.target.value.slice(0, 500))}
+              maxLength={500}
+              className="text-sm"
+              autoFocus
+            />
+            <div className="flex items-center justify-between">
+              <span className="font-mono text-xs text-muted-foreground">{text.length}/500</span>
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => {
+                    setEditing(false)
+                    setText(entry.data.text)
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button size="sm" onClick={handleSave}>
+                  Save
+                </Button>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <p data-testid="timeline-entry-text" className="text-sm text-foreground">
+            {entry.data.text}
+          </p>
+        )}
+        <p className="mt-1 text-xs text-muted-foreground">{entry.data.authorName}</p>
+      </div>
+
+      {isOwn && !editing && (
+        <div className="flex shrink-0 items-start gap-1">
+          <Button size="sm" variant="ghost" onClick={() => setEditing(true)}>
+            Edit
+          </Button>
+          <Button size="sm" variant="ghost" onClick={() => setConfirmingDelete(true)}>
+            Delete
+          </Button>
+        </div>
+      )}
+
+      <ConfirmModal
+        open={confirmingDelete}
+        onClose={() => setConfirmingDelete(false)}
+        onConfirm={handleDelete}
+        title="Delete this entry?"
+        description="This can't be undone."
+        confirmText="Delete"
+      />
+    </div>
+  )
+}
+
+function Composer({ incidentId, displayName }: { incidentId: string; displayName: string }) {
+  const mutations = useMutations<TimelineEntryData>('timeline-entries')
+  const [kind, setKind] = useState<EntryKind>('event')
+  const [text, setText] = useState('')
+
+  const canSubmit = mutations.ready && text.trim() !== ''
+
+  function handleSubmit(e: FormEvent) {
+    e.preventDefault()
+    if (!canSubmit) return
+    mutations.create({
+      incidentId,
+      text: text.trim(),
+      kind,
+      occurredAt: new Date().toISOString(),
+      authorName: displayName,
+    })
+    setText('')
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-3 rounded-lg border border-border bg-card p-4">
+      <div className="flex gap-2">
+        <Select value={kind} onValueChange={(v) => setKind(v as EntryKind)}>
+          <SelectTrigger className="w-32 shrink-0" disabled={!mutations.ready}>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="event">Event</SelectItem>
+            <SelectItem value="action">Action</SelectItem>
+            <SelectItem value="note">Note</SelectItem>
+          </SelectContent>
+        </Select>
+        <Textarea
+          value={text}
+          onChange={(e) => setText(e.target.value.slice(0, 500))}
+          maxLength={500}
+          placeholder="What happened?"
+          className="flex-1"
+          disabled={!mutations.ready}
+          aria-label="Entry text"
+        />
+      </div>
+      <div className="flex items-center justify-between">
+        <span className="font-mono text-xs text-muted-foreground">{text.length}/500</span>
+        <Button type="submit" disabled={!canSubmit}>
+          Add entry
+        </Button>
+      </div>
+    </form>
+  )
+}
+
+function PresencePanel({
+  peers,
+  currentUserId,
+  displayName,
+}: {
+  peers: { userId: string; userName: string }[]
+  currentUserId: string | null
+  displayName: string
+}) {
+  const count = peers.length + 1
+
+  return (
+    <section className="rounded-lg border border-border bg-card p-4">
+      <h2 className="mb-3 text-sm font-semibold">Presence</h2>
+      <p data-testid="presence-count" className="mb-3 text-xs text-muted-foreground">
+        {count} {count === 1 ? 'person' : 'people'} in this room
+      </p>
+      <div className="flex flex-wrap gap-2">
+        <PresenceChip userId={currentUserId ?? 'self'} name={displayName} self />
+        {peers.map((peer) => (
+          <PresenceChip key={peer.userId} userId={peer.userId} name={peer.userName} />
+        ))}
+      </div>
+    </section>
+  )
+}
+
+function PresenceChip({
+  userId,
+  name,
+  self = false,
+}: {
+  userId: string
+  name: string
+  self?: boolean
+}) {
+  const color = getUserColor(userId)
+  return (
+    <div
+      data-testid={self ? 'presence-self' : 'presence-peer'}
+      className="flex items-center gap-1.5 rounded-full border border-border bg-background py-1 pl-1 pr-2.5 text-xs"
+    >
+      <Avatar className="h-5 w-5">
+        <AvatarFallback style={{ backgroundColor: color, color: '#fff' }} className="text-[10px]">
+          {name[0]?.toUpperCase() ?? '?'}
+        </AvatarFallback>
+      </Avatar>
+      <span className="text-foreground">
+        {name}
+        {self ? ' (you)' : ''}
+      </span>
+    </div>
+  )
+}
+
+function PostmortemPanel({ entryCount }: { entryCount: number }) {
+  return (
+    <section className="rounded-lg border border-border bg-card p-4">
+      <h2 className="mb-3 text-sm font-semibold">Postmortem</h2>
+      {entryCount < 3 ? (
+        <p className="text-sm text-muted-foreground">Needs at least 3 entries ({entryCount}/3).</p>
+      ) : (
+        <Button disabled className="w-full">
+          Generate postmortem
+        </Button>
+      )}
+    </section>
   )
 }
