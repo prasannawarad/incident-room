@@ -30,3 +30,6 @@ AI is owner-billed (no user token) so reviewers without DeepSpace credits can us
 - Yjs co-editing of the postmortem
 - Slack webhook ingest of entries
 - Scheduled reminder on incidents stuck in "investigating"
+
+## Known gaps
+- Timeline entry text (SPEC: ≤500 chars) has no server-side length enforcement. `ColumnDefinition` has no length/pattern validator and `RecordRoom` has no beforeWrite hook (checked `node_modules/deepspace/dist/worker.d.ts` and `worker.js`: no such hook exists). The cap is enforced client-side only (composer `Textarea maxLength={500}`) — a client that bypasses the UI could write a longer entry.
