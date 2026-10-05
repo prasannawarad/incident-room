@@ -52,7 +52,7 @@ export default function Landing() {
             Teams log what's happening in one shared, live timeline. When it's over, AI drafts
             the postmortem — grounded only in what was written, every claim cited to an entry.
           </p>
-          <Link to="/home" className={cn(buttonVariants({ size: 'lg' }), 'gap-2')}>
+          <Link to="/incidents" className={cn(buttonVariants({ size: 'lg' }), 'gap-2')}>
             Sign in
           </Link>
         </div>
