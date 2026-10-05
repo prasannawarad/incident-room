@@ -16,9 +16,11 @@ export interface NavItem {
 }
 
 export const nav: NavItem[] = [
-  { path: '/home', label: 'Home' },
-  { path: '/settings', label: 'Settings' },
+  { path: '/incidents', label: 'Incidents' },
   // The /api-status debug page still exists — add
   // `{ path: '/api-status', label: 'API Status', devOnly: true }` to surface it.
+  // /settings has no nav link: sign-out already lives in the account menu,
+  // and nothing else on that page is needed by SPEC.md. The route itself
+  // is left in place (reachable by direct URL), just not advertised.
   // ── Features add nav items below this line ──
 ]

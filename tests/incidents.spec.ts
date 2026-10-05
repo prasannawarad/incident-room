@@ -1,8 +1,15 @@
 import { test, expect } from 'deepspace/testing'
 
+// Runs against the local dev server only (tests/playwright.config.ts hardcodes
+// baseURL to localhost, managed by `deepspace test run` — there is no code
+// path here that can reach a deployed app). Records this test creates are
+// real incidents/entries in that local database, not scratch rows a mock
+// wipes away; there's no delete UI yet to drive (not built until a later
+// phase), so every title is prefixed `[e2e]` to keep them identifiable
+// and easy to filter or clear out separately from real data.
 test('create incident: form submits and navigates to the new incident', async ({ users }) => {
   const [user] = await users(1)
-  const title = `Test outage ${Date.now()}`
+  const title = `[e2e] Test outage ${Date.now()}`
 
   await user.page.goto('/incidents')
   await expect(user.page.getByRole('heading', { name: 'Incidents', exact: true })).toBeVisible({

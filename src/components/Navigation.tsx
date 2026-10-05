@@ -70,7 +70,10 @@ export default function Navigation() {
   return (
     <>
       <nav data-testid="app-navigation" className="border-b border-border bg-background">
-        <div className="mx-auto flex h-12 max-w-7xl items-center gap-4 px-4">
+        {/* max-w-4xl + px-6 matches the incidents page's content column
+            (src/pages/(app)/(protected)/incidents/index.tsx) so the nav row
+            and the page below it share a left/right edge. */}
+        <div className="mx-auto flex h-12 max-w-4xl items-center gap-4 px-6">
           <Link to="/incidents" className="text-sm font-semibold text-foreground">
             {APP_NAME}
           </Link>
