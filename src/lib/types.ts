@@ -4,7 +4,10 @@ export type Severity = 'SEV1' | 'SEV2' | 'SEV3'
 export type IncidentStatus = 'investigating' | 'mitigated' | 'resolved'
 export type EntryKind = 'event' | 'action' | 'note'
 
-export interface IncidentData {
+// `type`, not `interface`: ActionTools methods are generic over
+// `T extends Record<string, unknown>`, and only object-literal type aliases
+// (not interfaces) satisfy that constraint check in server actions.
+export type IncidentData = {
   title: string
   severity: Severity
   system: string
@@ -12,7 +15,7 @@ export interface IncidentData {
   resolvedAt?: string | null
 }
 
-export interface TimelineEntryData {
+export type TimelineEntryData = {
   incidentId: string
   text: string
   kind: EntryKind
@@ -20,12 +23,12 @@ export interface TimelineEntryData {
   authorName: string
 }
 
-export interface ActionItem {
+export type ActionItem = {
   owner: string
   task: string
 }
 
-export interface PostmortemData {
+export type PostmortemData = {
   incidentId: string
   summary?: string
   rootCause?: string

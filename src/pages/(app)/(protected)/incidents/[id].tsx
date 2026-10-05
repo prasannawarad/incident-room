@@ -1,12 +1,13 @@
 /**
  * Incident detail — header + creator-only status control, live timeline,
- * composer, presence, and a postmortem placeholder (Phase 5 wires
- * generation).
+ * composer, presence, and the postmortem panel (triggers the
+ * generatePostmortem server action; src/actions/generate-postmortem.ts).
  */
 
 import { useState, type FormEvent } from 'react'
 import { useParams } from 'react-router-dom'
 import {
+  getAuthToken,
   getUserColor,
   useAuth,
   useDisplayName,
@@ -30,7 +31,17 @@ import {
   useToast,
 } from '@/components/ui'
 import { formatTimestamp } from '@/lib/utils'
-import type { EntryKind, IncidentData, IncidentStatus, Severity, TimelineEntryData } from '@/lib/types'
+import type {
+  EntryKind,
+  IncidentData,
+  IncidentStatus,
+  PostmortemData,
+  Severity,
+  TimelineEntryData,
+} from '@/lib/types'
+
+const MIN_ENTRIES_FOR_POSTMORTEM = 3
+const MAX_GENERATIONS = 3
 
 const SEVERITY_BADGE: Record<Severity, 'sev1' | 'sev2' | 'sev3'> = {
   SEV1: 'sev1',
@@ -93,7 +104,7 @@ export default function IncidentDetailPage() {
 
         <div className="space-y-6">
           <PresencePanel peers={peers} currentUserId={userId} displayName={displayName} />
-          <PostmortemPanel entryCount={entries.length} />
+          <PostmortemPanel incidentId={incidentId} entryCount={entries.length} />
         </div>
       </div>
     </div>
@@ -250,7 +261,11 @@ function TimelineEntryRow({
   }
 
   return (
-    <div data-testid="timeline-entry" className="flex gap-3 rounded-lg border border-border bg-card p-3">
+    <div
+      data-testid="timeline-entry"
+      data-record-id={entry.recordId}
+      className="flex gap-3 rounded-lg border border-border bg-card p-3"
+    >
       <span className="shrink-0 pt-0.5 font-mono text-xs text-muted-foreground">
         {formatTimestamp(entry.data.occurredAt)}
       </span>
@@ -426,17 +441,136 @@ function PresenceChip({
   )
 }
 
-function PostmortemPanel({ entryCount }: { entryCount: number }) {
+function scrollToEntry(entryId: string) {
+  document.querySelector(`[data-record-id="${entryId}"]`)?.scrollIntoView({
+    behavior: 'smooth',
+    block: 'center',
+  })
+}
+
+function PostmortemPanel({
+  incidentId,
+  entryCount,
+}: {
+  incidentId: string
+  entryCount: number
+}) {
+  const { records } = useQuery<PostmortemData>('postmortems', { where: { incidentId } })
+  const postmortem = records[0]
+  const [generating, setGenerating] = useState(false)
+  const [generateError, setGenerateError] = useState<string | null>(null)
+
+  const genCount = postmortem?.data.genCount ?? 0
+  const disabledReason =
+    entryCount < MIN_ENTRIES_FOR_POSTMORTEM
+      ? `Needs at least 3 entries (${entryCount}/3).`
+      : genCount >= MAX_GENERATIONS
+        ? `Generation limit reached (${MAX_GENERATIONS} of ${MAX_GENERATIONS} used).`
+        : null
+
+  async function handleGenerate() {
+    if (disabledReason || generating) return
+    setGenerating(true)
+    setGenerateError(null)
+    try {
+      const token = await getAuthToken()
+      const res = await fetch('/api/actions/generatePostmortem', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ incidentId }),
+      })
+      const result = (await res.json()) as { success: boolean; error?: string }
+      if (!result.success) {
+        setGenerateError(result.error ?? 'Could not generate the postmortem.')
+      }
+      // On success the write goes through tools.* on the server, which
+      // broadcasts the same as a client write — the useQuery above picks
+      // it up live, for both users, with no manual refetch here.
+    } catch {
+      setGenerateError('Could not reach the server. Try again in a moment.')
+    } finally {
+      setGenerating(false)
+    }
+  }
+
   return (
     <section className="rounded-lg border border-border bg-card p-4">
-      <h2 className="mb-3 text-sm font-semibold">Postmortem</h2>
-      {entryCount < 3 ? (
-        <p className="text-sm text-muted-foreground">Needs at least 3 entries ({entryCount}/3).</p>
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <h2 className="text-sm font-semibold">Postmortem</h2>
+        <span className="font-mono text-xs text-muted-foreground">
+          {genCount} of {MAX_GENERATIONS} generations used
+        </span>
+      </div>
+
+      {postmortem ? (
+        <div className="mb-4 space-y-3 text-sm">
+          <div>
+            <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Summary
+            </h3>
+            <p className="text-foreground">{postmortem.data.summary}</p>
+          </div>
+          <div>
+            <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Root cause
+            </h3>
+            <p className="text-foreground">{postmortem.data.rootCause}</p>
+          </div>
+          <div>
+            <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Impact
+            </h3>
+            <p className="text-foreground">{postmortem.data.impact}</p>
+          </div>
+          {postmortem.data.actionItems && postmortem.data.actionItems.length > 0 && (
+            <div>
+              <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Action items
+              </h3>
+              <ul className="space-y-1 text-foreground">
+                {postmortem.data.actionItems.map((item, i) => (
+                  <li key={i}>
+                    <span className="font-medium">{item.owner}:</span> {item.task}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {postmortem.data.sourceEntryIds && postmortem.data.sourceEntryIds.length > 0 && (
+            <div>
+              <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Cited entries
+              </h3>
+              <div className="flex flex-wrap gap-1">
+                {postmortem.data.sourceEntryIds.map((entryId, i) => (
+                  <button
+                    key={entryId}
+                    type="button"
+                    onClick={() => scrollToEntry(entryId)}
+                    className="rounded-md border border-border px-1.5 py-0.5 font-mono text-xs text-muted-foreground hover:border-ring hover:text-foreground"
+                  >
+                    [{i + 1}]
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          <p className="font-mono text-xs text-muted-foreground">{postmortem.data.model}</p>
+        </div>
       ) : (
-        <Button disabled className="w-full">
-          Generate postmortem
-        </Button>
+        <p className="mb-3 text-sm text-muted-foreground">No postmortem generated yet.</p>
       )}
+
+      <Button
+        onClick={handleGenerate}
+        disabled={generating || !!disabledReason}
+        loading={generating}
+        className="w-full"
+      >
+        {postmortem ? 'Regenerate' : 'Generate postmortem'}
+      </Button>
+      {disabledReason && <p className="mt-2 text-xs text-muted-foreground">{disabledReason}</p>}
+      {generateError && <p className="mt-2 text-sm text-destructive">{generateError}</p>}
     </section>
   )
 }
