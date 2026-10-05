@@ -1,7 +1,17 @@
 import type { ComponentProps } from 'react'
 import { cn } from '@/lib/utils'
 
-type Variant = 'default' | 'secondary' | 'destructive' | 'outline' | 'success' | 'warning' | 'info'
+type Variant =
+  | 'default'
+  | 'secondary'
+  | 'destructive'
+  | 'outline'
+  | 'success'
+  | 'warning'
+  | 'info'
+  | 'sev1'
+  | 'sev2'
+  | 'sev3'
 type Size = 'default' | 'sm' | 'lg'
 
 const VARIANTS: Record<Variant, string> = {
@@ -12,6 +22,10 @@ const VARIANTS: Record<Variant, string> = {
   success: 'bg-success text-success-foreground',
   warning: 'bg-warning text-warning-foreground',
   info: 'bg-info text-info-foreground',
+  // SPEC.md severity colors: SEV1 red, SEV2 amber, SEV3 blue.
+  sev1: 'bg-sev1 text-sev1-foreground',
+  sev2: 'bg-sev2 text-sev2-foreground',
+  sev3: 'bg-sev3 text-sev3-foreground',
 }
 
 const SIZES: Record<Size, string> = {

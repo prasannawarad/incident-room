@@ -8,36 +8,45 @@
 /*
  * Theming — pure shadcn/ui CSS variables with [data-theme] selectors.
  *
- * The @theme block below holds the default theme (slate). All other themes
- * live in `themes.css` as `[data-theme="<id>"]` override blocks. Switching
+ * The @theme block below holds the default (and only) theme: ops. The same
+ * values are mirrored as `[data-theme="ops"]` in `themes.css` so the app
+ * never shows unthemed colors if that attribute is ever missing. Switching
  * themes = changing the data-theme attribute on <html> in index.html. No
  * JS, no FOUC.
  *
- * Status colors (success, warning, info) are intentionally NOT themed —
- * they stay consistent across every preset.
+ * Status colors (success, warning, info) and the SEV1/2/3 severity colors
+ * are intentionally NOT themed — they stay constant (single theme, so this
+ * is moot today, but keeps the contract if a second theme is ever added).
  */
 @theme {
-  /* shadcn core tokens — slate (default): neutral gray on near-black, indigo accent */
-  --color-background: #0a0a0a;
-  --color-foreground: #e8eaed;
-  --color-card: #161616;
-  --color-card-foreground: #e8eaed;
-  --color-popover: #161616;
-  --color-popover-foreground: #e8eaed;
-  --color-primary: #818cf8;
-  --color-primary-foreground: #ffffff;
-  --color-secondary: #1e1e1e;
-  --color-secondary-foreground: #e8eaed;
-  --color-muted: #1e1e1e;
-  --color-muted-foreground: #9ca3af;
-  --color-accent: #262626;
-  --color-accent-foreground: #e8eaed;
+  /* shadcn core tokens — ops (default, and only theme): cool near-black
+     with a cyan "signal" accent. Ops-console palette for Incident Room —
+     see src/themes.css [data-theme="ops"] for the mirrored override block. */
+  --color-background: #0a0e14;
+  --color-foreground: #d6dde5;
+  --color-card: #11161d;
+  --color-card-foreground: #d6dde5;
+  --color-popover: #11161d;
+  --color-popover-foreground: #d6dde5;
+  --color-primary: #22d3ee;
+  --color-primary-foreground: #04171c;
+  --color-secondary: #161d26;
+  --color-secondary-foreground: #d6dde5;
+  --color-muted: #161d26;
+  --color-muted-foreground: #8b98a6;
+  --color-accent: #1c2530;
+  --color-accent-foreground: #d6dde5;
   --color-destructive: #ef4444;
   --color-destructive-foreground: #ffffff;
-  --color-border: rgba(60, 64, 67, 0.6);
-  --color-input: rgba(60, 64, 67, 0.6);
-  --color-ring: #818cf8;
-  --radius: 0.5rem;
+  --color-border: rgba(61, 78, 94, 0.5);
+  --color-input: rgba(61, 78, 94, 0.5);
+  --color-ring: #22d3ee;
+  /* Smaller than the shadcn default (0.5rem) — denser, more technical
+     corners read as "ops tool" rather than "consumer app". */
+  --radius: 0.25rem;
+  /* System monospace stack for timestamps and entry metadata — no web font
+     fetch, loads instantly. */
+  --font-mono: 'SF Mono', 'JetBrains Mono', ui-monospace, Menlo, Consolas, monospace;
 
   /*
    * Map the rounded-* utilities onto --radius so a theme (or you) can change
@@ -59,8 +68,21 @@
   --color-info: #3b82f6;
   --color-info-foreground: #ffffff;
 
+  /* Severity colors — SPEC.md's SEV1/SEV2/SEV3 domain model. SEV1
+     intentionally matches --color-destructive (same visual weight as a
+     destructive action); SEV2/SEV3 share the warning/info hues. Separate
+     tokens so a future tweak to generic warning/info toasts can't
+     accidentally recolor severity badges. sev2's foreground is dark, not
+     white — amber background needs dark text for readable contrast. */
+  --color-sev1: #ef4444;
+  --color-sev1-foreground: #ffffff;
+  --color-sev2: #f59e0b;
+  --color-sev2-foreground: #1a1206;
+  --color-sev3: #3b82f6;
+  --color-sev3-foreground: #ffffff;
+
   /*
-   * Shadows — slate (default). Each theme in themes.css tunes these.
+   * Shadows — ops (default). Each theme in themes.css tunes these.
    *
    * Toned down 2026-05: previous values were 8px/12px offset with
    * 32px/40px blur which read as a heavy halo under every Card on
@@ -88,8 +110,8 @@
      simply doesn't reference them. In every theme keep the panel reading as
      elevated: dark → panel lighter than shell; light → white panel on a
      faintly darker shell. */
-  --color-shell: #0a0a0a;
-  --color-shell-panel: #161616;
+  --color-shell: #0a0e14;
+  --color-shell-panel: #11161d;
 
   /* Animations */
   --animate-pulse-glow: pulse-glow 2s ease-in-out infinite;

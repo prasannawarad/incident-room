@@ -1,12 +1,13 @@
 /*
  * Theme overrides — applied via <html data-theme="<id>">.
  *
- * Default values live in `styles.css` (@theme block, slate — a neutral
- * placeholder, not a design choice). Every app should define its OWN theme
- * before first deploy: copy the example block below, rename the selector,
- * and set colors that fit the product. Shape comes from `--radius`.
+ * Default values live in `styles.css` (@theme block, ops). This file mirrors
+ * the same values as an explicit `[data-theme="ops"]` block so the app never
+ * renders unthemed colors if the attribute is ever missing, and so the
+ * pre-deploy smoke test (which greps this file for a named theme block)
+ * passes. Shape comes from `--radius` (set in styles.css).
  *
- * To add a theme:
+ * To add a second theme:
  *   1. Add a `[data-theme="my-id"] { ... }` block overriding the shadcn
  *      tokens below. If the theme is light, include `color-scheme: light;`
  *      so native form controls (calendar icons, scrollbars) match.
@@ -16,31 +17,30 @@
  *   4. Switch to it via `data-theme` on <html> in index.html.
  */
 
-/* Paper — light example theme; shows the full token contract incl.
- * `color-scheme: light`. Replace or delete it once the app has its own. */
-[data-theme="paper"] {
-  color-scheme: light;
-  --color-background: #ffffff;
-  --color-foreground: #0a0a0a;
-  --color-card: #fafafa;
-  --color-card-foreground: #0a0a0a;
-  --color-popover: #ffffff;
-  --color-popover-foreground: #0a0a0a;
-  --color-primary: #171717;
-  --color-primary-foreground: #ffffff;
-  --color-secondary: #f5f5f5;
-  --color-secondary-foreground: #0a0a0a;
-  --color-muted: #f5f5f5;
-  --color-muted-foreground: #525252;
-  --color-accent: #e5e5e5;
-  --color-accent-foreground: #0a0a0a;
-  --color-destructive: #dc2626;
+/* Ops — dense, dark, ops-console palette. Cool near-black background, cyan
+ * "signal" accent, no gradients. The only theme Incident Room ships. */
+[data-theme="ops"] {
+  --color-background: #0a0e14;
+  --color-foreground: #d6dde5;
+  --color-card: #11161d;
+  --color-card-foreground: #d6dde5;
+  --color-popover: #11161d;
+  --color-popover-foreground: #d6dde5;
+  --color-primary: #22d3ee;
+  --color-primary-foreground: #04171c;
+  --color-secondary: #161d26;
+  --color-secondary-foreground: #d6dde5;
+  --color-muted: #161d26;
+  --color-muted-foreground: #8b98a6;
+  --color-accent: #1c2530;
+  --color-accent-foreground: #d6dde5;
+  --color-destructive: #ef4444;
   --color-destructive-foreground: #ffffff;
-  --color-border: #e5e5e5;
-  --color-input: #e5e5e5;
-  --color-ring: #171717;
-  --shadow-card: 0 1px 2px 0 rgba(0, 0, 0, 0.016);
-  --shadow-card-hover: 0 2px 8px 0 rgba(0, 0, 0, 0.032);
-  --color-shell: #fafafa;
-  --color-shell-panel: #ffffff;
+  --color-border: rgba(61, 78, 94, 0.5);
+  --color-input: rgba(61, 78, 94, 0.5);
+  --color-ring: #22d3ee;
+  --shadow-card: 0 1px 2px 0 rgba(0, 0, 0, 0.12);
+  --shadow-card-hover: 0 2px 8px 0 rgba(0, 0, 0, 0.16);
+  --color-shell: #0a0e14;
+  --color-shell-panel: #11161d;
 }

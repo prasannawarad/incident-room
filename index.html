@@ -4,22 +4,21 @@
   To switch themes, change `data-theme` to any id defined in src/themes.ts.
   Color values per theme live in src/themes.css.
 -->
-<html lang="en" data-theme="slate">
+<html lang="en" data-theme="ops">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <link rel="icon" href="/favicon.ico" />
-    <title>incident-room</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <title>Incident Room</title>
     <!--
       First-paint background, keyed to the data-theme attribute above.
       Without this the browser paints white until the CSS bundle arrives —
-      a hard flash on the dark themes. Each value mirrors --color-background
-      in src/styles.css (slate) / src/themes.css; keep them in sync when
-      adding or editing themes.
+      a hard flash on the dark themes. Mirrors --color-background in
+      src/styles.css / src/themes.css; keep them in sync when editing the
+      theme.
     -->
     <style>
-      html { background-color: #0a0a0a; color-scheme: dark; }
-      html[data-theme="paper"] { background-color: #ffffff; color-scheme: light; }
+      html { background-color: #0a0e14; color-scheme: dark; }
       /* Add one line per theme you create, mirroring its --color-background. */
     </style>
   </head>
