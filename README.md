@@ -1,79 +1,112 @@
 # Incident Room
 
-A shared, live incident timeline. Responders log what happened as it happens; when it's over, the app drafts a postmortem grounded only in that timeline, with every claim tied to an entry.
+A shared incident timeline that updates live for everyone in the room.
+When the incident is over, it drafts a postmortem from that timeline, and every claim cites a timeline entry.
 
 Live: https://incident-room-pw.app.space | Repo: https://github.com/prasannawarad/incident-room
 
 ## Try it in 60 seconds
 
-Sign in → **Load demo incident** → open it → **Generate postmortem**. Works end to end for a single account — the demo button seeds a realistic 8-entry Airflow outage so you don't need a second person to see the whole flow.
+Sign in, click **Load demo incident**, open the incident, then click **Generate postmortem**. One account is enough. The demo button seeds an Airflow outage with 8 timeline entries, so you can see the whole flow without a second person.
 
-## DeepSpace pieces used
+## What I built and why
 
-- **Auth** — `AuthGate` gates `/incidents` and `/incidents/:id`; every write's `createdBy` comes from the verified JWT (`RecordRoom`'s own envelope field), never from client input.
-- **Records + RBAC** — three schemas in `src/schemas/`: `incidents` (`update: 'own'` → creator-only status changes), `timeline-entries` (`update: 'own'` → author-only edits), `postmortems` (`create: false` / `update: false` for every client role — written only by the server action). Server-side denial is verified in unit tests against the SDK's own permission functions (`canUpdate`/`canCreate`), not a live server-side test; the live UI separately hides the control for non-creators/non-authors.
-- **Real-time sync** — `useQuery` on `timeline-entries` and `postmortems` updates live across browsers with no reload (covered by a two-user e2e test).
-- **Presence** — `usePresenceRoom(\`incident:${id}\`)` shows who else is viewing each incident's room.
-- **Server action + `createDeepSpaceAI`** — `src/actions/generate-postmortem.ts`'s `generatePostmortem(incidentId)` runs server-side via `tools.*` (bypasses client RBAC) and calls `createDeepSpaceAI` with no `authToken`, so the app owner is billed, not the caller.
+During an outage, updates end up spread across Slack threads, calls, and DMs. Afterwards someone rebuilds the timeline by hand to write the postmortem. Incident Room keeps one live timeline per incident that every responder writes to, and drafts the postmortem from that timeline when the incident is over.
 
-## Left out, and why
+## DeepSpace pieces I used
 
-- **Payments** — no monetization in an eval build.
-- **LiveKit/voice** — a written timeline is the product.
-- **File uploads** — pasted log text covers it.
-- **Full AI chat panel** — one structured generation fits better than open chat.
-- **Yjs co-editing of the postmortem** — next step.
-- **Slack webhook ingest, scheduled stale-incident reminders** — next steps.
+- **Auth.** `AuthGate` protects `/incidents` and `/incidents/:id`. A signed-out visitor gets a sign-in prompt in place.
+- **Records + RBAC.** Three schemas in `src/schemas/`. Only an incident's creator can change its status. Only an entry's author can edit or delete it. No client role can create or update a postmortem, including admin.
+- **Real-time sync.** `useQuery` on `timeline-entries` and `postmortems` pushes new entries and new postmortems to every open browser without a reload.
+- **Presence.** ``usePresenceRoom(`incident:${id}`)`` shows who else has the incident open.
+- **Server action + `createDeepSpaceAI`.** `generatePostmortem(incidentId)` in `src/actions/generate-postmortem.ts` loads the incident and its entries server-side, calls the model, checks the output, and writes the postmortem record.
 
-## Main tradeoff
+## What I left out and why
 
-AI is owner-billed (no user token), so reviewers without DeepSpace credits can still use the core feature. Cost: I pay. Controls: 3 generations per incident, 30 generations per day across the whole app, 1500 max output tokens per call, and the cheapest capable model (resolved from the live SDK catalog, currently `claude-haiku-4-5`) — not hardcoded.
+- **Payments.** This is an evaluation build with nothing to sell.
+- **LiveKit voice.** The product is a written timeline, and a call does not produce one.
+- **File uploads.** Responders can paste log lines into an entry.
+- **AI chat panel.** One structured generation with citations is easier to check than an open chat.
+- **Yjs co-editing.** I wanted the core path solid first. It is the first item under Next.
 
-## Security notes
+I did not add more integrations. None of the ones available would improve a written, live timeline.
 
-- Entry text, incident title, and system are fenced as untrusted data in the postmortem prompt (wrapped in `"""..."""`, with any literal `"""` inside them neutralized to `'''` first) — the model is told explicitly not to treat entry text as instructions.
-- Every `sourceEntryId` the model returns is checked against the incident's real entry ids before being stored; anything invented is dropped, and a result with zero surviving citations is treated as a failed attempt and retried, never stored.
-- Postmortems are written only by the server action (`tools.create`/`tools.update`) — client `create`/`update` is denied for every role, including admin.
-- `createdBy`/`authorId` are never client-supplied columns — they're the record envelope's server-stamped field, verified against the caller's JWT.
+## The main tradeoff
 
-## Known gaps
+The AI call is billed to me as the app owner. The server action calls `createDeepSpaceAI` without the caller's `authToken`. I did this so a reviewer with no DeepSpace credits can still use the core feature. The cost is mine, so I capped it:
 
-- The 500-char entry limit is enforced client-side only — no server-side length validator exists on `ColumnDefinition` or `RecordRoom`.
-- Incident status can jump to any value (investigating/mitigated/resolved), not just forward — deliberate, so a mistaken status change can be corrected.
-- Two concurrent "Generate" clicks can both read the same `genCount` before either writes, so the per-incident cap can be exceeded by one request under a race.
-- Timeline entry edit/delete are fire-and-forget (rely on the app's global write-error toast), unlike the header's status control, which uses confirmed mutations.
-- The incident detail page finds its record by filtering the whole `incidents` collection client-side, not a server-scoped lookup — fine at this app's scale.
-- "Load demo incident" creates a new demo incident every click — no dedup against an existing one.
-- `/settings` route still exists (sign-out moved to the account-menu dropdown) but has no nav link.
+- 3 generations per incident
+- 30 generations per day across the whole app
+- 1500 max output tokens per call
+- The cheapest capable model, picked from the SDK's model catalog at runtime instead of a hardcoded list. Today that is Claude Haiku 4.5.
 
-## Next steps
+## How I used the agent
 
-- Yjs co-editing of the generated postmortem.
-- Slack webhook ingest of entries.
-- Scheduled reminder on incidents stuck in "investigating."
+Claude Code built phases 0 to 5 from `SPEC.md` and one prompt per phase in `docs/PROMPTS.md`. Each prompt ends with "report, stop". I planned the phases, read every report before I approved the next phase, and set the working rules in `CLAUDE.md`: get SDK signatures from the `.d.ts` files, take caller identity only from the verified JWT, and never run `deepspace push`.
 
-## What the agent did
-
-- **Phase 0** — read SPEC.md and the DeepSpace docs/`.d.ts`, planned the schema/RBAC approach and file layout. No code.
-- **Phase 1** (`25e6646`) — `incidents`/`timeline-entries`/`postmortems` schemas + RBAC, two-user RBAC unit test, GitHub repo created and wired as source authority.
-- **Phase 2** (`13d9a21`) — static landing page, own ops-console theme (replacing the slate/paper scaffold placeholders), first deploy.
-- **Phase 3** (`c858fec`) — incidents list (open/resolved, newest first), create-incident dialog, demo-seed button (8-entry Airflow outage).
-- **Polish** (`533fdda`) — nav cleanup (Home → Incidents, dropped unused Settings link), nav/content column alignment, e2e test data hygiene.
-- **Phase 4** (`322e970`) — full incident room: header + creator-only status control, live timeline, composer, presence, postmortem placeholder; two-user e2e test (live sync, presence, status control hidden for non-creators in the UI — server-side denial is covered separately by unit tests, not this test).
-- **Phase 5** (`4b10bc4`) — `generatePostmortem` server action (prompt-injection-resistant prompt, zod-validated structured output, per-incident + daily caps), wired into the real postmortem panel; mocked unit tests plus one real, credit-spending verification (normal case + an adversarial prompt-injection case the model correctly resisted).
-- Two deploys to https://incident-room-pw.app.space, after Phase 2 and after Phase 5.
+- `6c3a69f` Scaffold and agent kit (`CLAUDE.md`, `SPEC.md`, `docs/PROMPTS.md`).
+- Phase 0: read the DeepSpace docs and type definitions and wrote a plan. No code, no commit.
+- `25e6646` Phase 1: the three schemas with RBAC, plus an RBAC unit test that runs as two users.
+- `13d9a21` Phase 2: static landing page, ops-console theme, first deploy.
+- `c858fec` Phase 3: incidents list, create form, demo seed button.
+- `533fdda` Polish: nav labels and e2e test data cleanup.
+- `322e970` Phase 4: incident room with timeline, composer, presence, and creator-only status control.
+- `4b10bc4` Phase 5: the `generatePostmortem` server action and the postmortem panel.
 
 ## What I verified or changed myself
 
-<!-- DRAFT: author to edit — lists only checks the agent actually ran, sourced from docs/VERIFY.md and git log. Nothing here was changed by hand; docs/VERIFY.md's own "Log what I changed by hand" is still empty. -->
+**RBAC.** The RBAC unit test reads the default role from the real `users` schema (falling back to the SDK's `ROLE_DEFAULT`) instead of hardcoding it, so a fresh second account is tested with the role it actually gets. `createdBy` is the record envelope field the server stamps from the caller's JWT. The client never sends it.
 
-- `npx tsc --noEmit` and `npx deepspace test run all` green at every phase; last full run: 34/34 (20 unit, 14 e2e).
-- Live production verification (2026-10-05, full detail and raw results in [docs/VERIFY.md](./docs/VERIFY.md)): demo incident seeds exactly 8 entries in order; postmortem generation grounded with real citations against real entry ids; B sees A's postmortem and a new entry live with no reload; B's status control renders as read-only, not editable; 3 real generations enforced the per-incident cap, with a 4th attempt rejected server-side at zero extra AI cost; signed-out `/incidents` gates to sign-in in place; `npx deepspace logs` showed zero errors/warnings/exceptions; `npx deepspace app usage` delta matched exactly 3 generations (6 ledger entries).
-- **One check from that pass was explicitly not run as a live attack**: forcing an incident's status to change as a non-creator via a direct call. Verified instead via the Phase 1 unit test (`canUpdate` denies it for a non-owner) plus confirming B's rendered page has no editable control — that's a narrower claim than observing a live server-side denial, and docs/VERIFY.md says so.
-- Secrets scan (`git grep` for key/token patterns) and `.dev.vars`-ignored check, run clean on every pass.
+**Structured output.** The code calls `generateText` with `Output.object` and a zod schema. `generateObject` is marked `@deprecated` in the installed `ai` package (7.0.107), with a note to use `generateText` with an `output` setting.
 
-## Docs index
+**The postmortem prompt.** The Phase 5 prompt required the agent to show me the prompt text before wiring the UI. After reading it, I required three changes:
 
-- [SPEC.md](./SPEC.md) — product spec.
-- [docs/PROMPTS.md](./docs/PROMPTS.md) — the per-phase work order given to the agent.
-- [docs/VERIFY.md](./docs/VERIFY.md) — manual verification checklist.
+- A global cap of 30 generations per day, on top of the per-incident cap of 3.
+- The incident title, the system name, and every entry's text are fenced as untrusted data. Each is wrapped in `"""`, any `"""` inside it is replaced with `'''` first, and the system prompt tells the model not to follow instructions found inside entries.
+- Every cited entry id is checked against the incident's real entries. Invented ids are dropped. A result with zero valid citations counts as a failed attempt and is retried once, never stored.
+
+**Prompt injection.** I ran one real generation against an adversarial timeline with injected instructions in the entry text. The model treated them as incident narrative and did not follow them.
+
+**Live two-account pass on production** (2026-10-05, raw results in [docs/VERIFY.md](docs/VERIFY.md)). Two test accounts, A and B, on https://incident-room-pw.app.space:
+
+- The demo incident seeded exactly 8 entries in the right order.
+- The first generation succeeded. All 7 cited entry ids exist among the incident's real entries.
+- B opened A's link and saw the postmortem and A's new entry appear with no reload.
+- B's page had zero status-control elements. The control is hidden for non-creators.
+- Generations 2 and 3 succeeded. The UI then showed "3 of 3" and disabled the button.
+- A 4th attempt sent straight to the server action was rejected with `generation_cap` before any model call, so it cost nothing.
+- Signed out, `/incidents` shows the sign-in prompt in place.
+- `npx deepspace logs` showed zero errors, warnings, or exceptions.
+- `npx deepspace app usage` moved by exactly 6 ledger entries, which is 3 generations. No extra calls.
+
+The full test suite passed at every phase. The last run was 34/34 (20 unit, 14 e2e). A secrets grep and the `.dev.vars` ignore check were clean.
+
+**Polish commit** (`533fdda`). The nav said "Home" and linked an unused Settings page. It now says "Incidents" and the Settings link is gone. Test incidents are now prefixed `[e2e]` so they do not mix with real ones in the list.
+
+**Limit of this verification.** I did not send a forged status change as B against production. That server-side denial is verified only in unit tests that call the SDK's own permission functions (`canUpdate` returns false for a non-creator). It has not been observed as a live request.
+
+## Known gaps
+
+- The 500-character entry limit is enforced only in the client. There is no server-side length check.
+- Status can jump to any value (investigating, mitigated, resolved), backwards too. This is on purpose so a wrong status change can be undone.
+- Two "Generate" clicks at the same moment can both read the same `genCount`, so the per-incident cap can be exceeded by one.
+- Editing and deleting an entry are fire-and-forget. They rely on the app's global write-error toast. The status control uses confirmed mutations.
+- The incident page finds its record by filtering the whole `incidents` collection in the client, not with a server-side lookup. That is fine at this scale.
+- **Load demo incident** creates a new incident on every click.
+- The `/settings` route still exists but nothing links to it. Sign-out moved to the account menu.
+
+## Not deployed
+
+A read-only status chip with a tooltip for non-creators is done but sits in `git stash`. It is not in the live app, where non-creators see no status control at all.
+
+## Next
+
+- Yjs co-editing of the generated postmortem.
+- Slack webhook ingest of timeline entries.
+- Reminders for incidents stuck in "investigating".
+
+## Docs
+
+- [SPEC.md](SPEC.md): product spec, data model, RBAC rules.
+- [docs/PROMPTS.md](docs/PROMPTS.md): the per-phase prompts I gave the agent.
+- [docs/VERIFY.md](docs/VERIFY.md): my verification checklist and the production pass results.
