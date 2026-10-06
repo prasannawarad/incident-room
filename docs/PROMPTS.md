@@ -20,4 +20,4 @@ Build incidents/[id]: header, creator-only status control (hide for others AND r
 Implement generatePostmortem per SPEC.md exactly: JWT check, ≥3 entries, genCount cap 3, owner-billed createDeepSpaceAI (no authToken), model resolved from SDK catalog, grounding prompt with entry-id citations, zod validation + one retry, upsert. Panel shows summary, root cause, impact, action items, cited entry ids, remaining generations, error state. Tests: cap enforced; <3 entries rejected. Show me the prompt text before wiring the UI. Report, stop.
 
 ## Phase 6 — ship + check ~30 min
-Run `npx deepspace test run all`, commit, push, deploy. Then `npx deepspace logs --follow --json` while I click the core path. Run `npx deepspace app usage`. Run `git grep -nE "(sk-|api[_-]?key|secret)"` and `git check-ignore .dev.vars`. Report anything odd. Do not edit WRITEUP.md; I write it.
+Run `npx deepspace test run all`, commit, push, deploy. Then `npx deepspace logs --follow --json` while I click the core path. Run `npx deepspace app usage`. Run `git grep -nE "(sk-|api[_-]?key|secret)"` and `git check-ignore .dev.vars`. Report anything odd. Do not edit README.md; I write it.
