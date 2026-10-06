@@ -65,7 +65,7 @@ Claude Code built phases 0 to 5 from `SPEC.md` and one prompt per phase in `docs
 - The incident title, the system name, and every entry's text are fenced as untrusted data. Each is wrapped in `"""`, any `"""` inside it is replaced with `'''` first, and the system prompt tells the model not to follow instructions found inside entries.
 - Every cited entry id is checked against the incident's real entries. Invented ids are dropped. A result with zero valid citations counts as a failed attempt and is retried once, never stored.
 
-**Prompt injection.** I ran one real generation against an adversarial timeline with injected instructions in the entry text. The model treated them as incident narrative and did not follow them.
+**Prompt injection.** At my direction, the agent ran one real generation locally, once, against a timeline with injected instructions in an entry. The root cause stayed the real one from another entry, and the injection entry was not cited. Details in [docs/VERIFY.md](docs/VERIFY.md).
 
 **Live two-account pass on production** (2026-10-05, raw results in [docs/VERIFY.md](docs/VERIFY.md)). Two test accounts, A and B, on https://incident-room-pw.app.space:
 
@@ -81,7 +81,7 @@ Claude Code built phases 0 to 5 from `SPEC.md` and one prompt per phase in `docs
 
 The full test suite passed at every phase. The last run was 34/34 (20 unit, 14 e2e). A secrets grep and the `.dev.vars` ignore check were clean.
 
-**Polish commit** (`533fdda`). The nav said "Home" and linked an unused Settings page. It now says "Incidents" and the Settings link is gone. Test incidents are now prefixed `[e2e]` so they do not mix with real ones in the list.
+**Polish commit** (`533fdda`). The nav said "Home" and linked an unused Settings page. It now says "Incidents" and the Settings link is gone. Test incidents are now prefixed `[e2e]` so they are identifiable in the list.
 
 **Limit of this verification.** I did not send a forged status change as B against production. That server-side denial is verified only in unit tests that call the SDK's own permission functions (`canUpdate` returns false for a non-creator). It has not been observed as a live request.
 
