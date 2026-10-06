@@ -3,7 +3,7 @@
 ## Live URL, two browsers (normal + incognito), two accounts
 - [ ] A creates incident; B opens link → B shows in presence
 - [ ] A adds entry → appears in B without reload (and reverse)
-- [ ] B has no editable status control; B sees read-only locked status; forcing an update via devtools is denied (RBAC, not just UI)
+- [ ] B has no editable status control; status control is hidden for non-creators; forcing an update via devtools is denied (RBAC, not just UI)
 - [ ] Postmortem with <3 entries → clear error
 - [ ] Generate → appears for both; every claim cites real entry ids; nothing invented
 - [ ] 4th generation blocked by cap
@@ -37,7 +37,7 @@ One-time exception to "never call generate on production," capped at 3 real gene
 | 2 | Generate postmortem #1: success, non-empty root cause | **PASS** — `rootCause`: "A partitioning change increased shuffle size past executor memory limits, causing OOM-kills in the Spark executor during the transform_orders step." |
 | 3 | Every cited `sourceEntryId` exists among the incident's real entries (`data-record-id`) | **PASS** — all 7 cited ids confirmed present in the real 8-entry set. |
 | 4 | B opens A's link; postmortem appears with no reload | **PASS** |
-| 5 | B has no editable status control rendered | **PASS** — `data-testid="status-control"` count = 0 on B's page; current local UI now also renders a read-only locked status chip for non-creators so the header does not look incomplete. |
+| 5 | B has no editable status control rendered | **PASS** — `data-testid="status-control"` count = 0 on B's page; the status control is hidden for non-creators. |
 | 6 | A adds `[e2e] production live-sync check <ts>`; B sees it with no reload | **PASS** |
 | 7–8 | Regenerate #2, #3 (genCount → 2, then 3) | **PASS** both |
 | 9 | UI shows "3 of 3" after the 3rd generation | **PASS** |
